@@ -2,10 +2,15 @@ name: molpmofit
 channels:
   - conda-forge
   - defaults
+  - fastai
+  - pytorch
 dependencies:
+  - pytorch
+  - torchvision
+  - cuda100
   - rdkit
   - fastai
   - jupyter
   - jupyterlab
-prefix: /home/xinhao/anaconda3/envs/molpmofit
+  - scikit-learn
 
