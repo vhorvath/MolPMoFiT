@@ -38,62 +38,64 @@ BOS,EOS,FLD,UNK,PAD = 'xxbos','xxeos','xxfld','xxunk','xxpad'
 TK_MAJ,TK_UP,TK_REP,TK_WREP = 'xxmaj','xxup','xxrep','xxwrep'
 defaults.text_spec_tok = [PAD]
 
-special_tokens = ['[BOS]', '[C@H]', '[C@@H]','[C@]', '[C@@]','[C-]','[C+]', '[c-]', '[c+]','[cH-]',
-                   '[nH]', '[N+]', '[N-]', '[n+]', '[n-]' '[NH+]', '[NH2+]',
-                   '[O-]', '[S+]', '[s+]', '[S-]', '[O+]', '[SH]', '[B-]','[BH2-]', '[BH3-]','[b-]',
-                   '[PH]','[P+]', '[I+]', 
-                  '[Si]','[SiH2]', '[Se]','[SeH]', '[se]', '[Se+]', '[se+]','[te]','[te+]', '[Te]']
+# Special tokens that must be kept together
+special_tokens = [ '[BOS]', # beginning of sequence
+                   '[C@H]', '[C@@H]','[C@]', '[C@@]','[C-]','[C+]', '[c-]', '[c+]','[cH-]', # carbon chiralities
+                   '[nH]', '[N+]', '[N-]', '[n+]', '[n-]' '[NH+]', '[NH2+]', # nitrogen
+                   '[O-]', '[O+]', # oxygen
+                   '[S+]', '[s+]', '[S-]', '[SH]', # sulfur
+                   '[B-]','[BH2-]', '[BH3-]','[b-]', # boron
+                   '[PH]','[P+]', # phosphorous 
+                   '[I+]', # halogen
+                   '[Si]','[SiH2]', '[Se]','[SeH]', '[se]', '[Se+]', '[se+]','[te]','[te+]', '[Te]' # metallic elements
+                 ]
+
+# Elements of our interest that have two letter symbols
+merge_elements = ['Br', 'Cl']
 
 class MolTokenizer(BaseTokenizer):
-    def __init__(self, lang = 'en', special_tokens = special_tokens):
-        self.lang = lang
-        self.special_tokens = special_tokens
+    def __init__(self, lang = 'en', special_tokens = special_tokens, merge_elements = merge_elements):
+        super().__init__(lang = lang)
+        self.__special_tokens = special_tokens
+        self.__merge_elements = merge_elements if merge_elements is not None else []
         
     def tokenizer(self, smiles):
         # add specific token '[BOS]' to represetences the start of SMILES
-        smiles = '[BOS]' + smiles
         regex = '(\[[^\[\]]{1,10}\])'
-        char_list = re.split(regex, smiles)
+        parts = re.split(regex, smiles)
         tokens = []
-        
-        if self.special_tokens:
-            for char in char_list:
-                if char.startswith('['):
-                    if char in special_tokens:
-                        tokens.append(str(char))
-                    else:
-                        tokens.append('[UNK]')
+       
+        if self.__special_tokens:
+            for part in parts:
+                if part.startswith('['):
+                    tokens += [part] if part in self.__special_tokens else ['[UNK]'] 
                 else:
-                    chars = [unit for unit in char]
-                    [tokens.append(i) for i in chars]                    
-        
-        if not self.special_tokens:
-            for char in char_list:
-                if char.startswith('['):
-                    tokens.append(str(char))
-                else:
-                    chars = [unit for unit in char]
-                    [tokens.append(i) for i in chars]
-                
-        #fix the 'Br' be splited into 'B' and 'r'
-        if 'B' in tokens:
-            for index, tok in enumerate(tokens):
-                if tok == 'B':
-                    if index < len(tokens)-1: # make sure 'B' is not the last character
-                        if tokens[index+1] == 'r':
-                            tokens[index: index+2] = [reduce(lambda i, j: i + j, tokens[index : index+2])]
-        
-        #fix the 'Cl' be splited into 'C' and 'l'
-        if 'l' in tokens:
-            for index, tok in enumerate(tokens):
-                if tok == 'l':
-                    if tokens[index-1] == 'C':
-                            tokens[index-1: index+1] = [reduce(lambda i, j: i + j, tokens[index-1 : index+1])]
-        return tokens    
-    
-    def add_special_cases(self, toks):
-        pass
+                    tokens += list(part)
+        else:
+            for part in parts:
+                tokens += [part] if part.startswith('[') else list(part)                
 
+        # merge two letter element tokens
+        for element in self.__merge_elements:
+            MolTokenizer.patch_double(tokens, element)
+        
+        return ['[BOS]'] + tokens
+    
+    @staticmethod
+    def patch_double(tokens, pair):
+        first, second = list(pair)
+        while True:
+            try:
+                ix = tokens.index(second)
+
+                if tokens[ix - 1] == first:
+                    tokens[ix - 1] = first + second
+                    del tokens[ix]
+            except ValueError:
+                return tokens
+        
+    def add_special_cases(self, tokens):
+        pass
 
 def auroc_score(input, target):
     input, target = input.cpu().numpy()[:,1], target.cpu().numpy()
