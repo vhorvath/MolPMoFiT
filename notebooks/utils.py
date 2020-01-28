@@ -3,31 +3,35 @@ from fastai.text import *
 from sklearn.metrics import roc_auc_score
 from rdkit import Chem
 import numpy as np
-import threading
 
-def randomize_smiles(smiles):
+def randomize_smiles(smiles, N_rounds):
+    smiles_random = [None] * N_rounds
     m = Chem.MolFromSmiles(smiles)
-    ans = list(range(m.GetNumAtoms()))
-    np.random.shuffle(ans)
-    nm = Chem.RenumberAtoms(m,ans)
-    return Chem.MolToSmiles(nm, canonical=False, isomericSmiles=True, kekuleSmiles=False)
-
-
-def smiles_augmentation(df, N_rounds):
-    dist_aug = {col_name: [] for col_name in df}
-
-    for i in range(df.shape[0]):
-        for j in range(N_rounds):
-            dist_aug['SMILES'].append(randomize_smiles(df.iloc[i].SMILES))
-            dist_aug['canonical'].append('no')
-
-    df_aug = pd.DataFrame.from_dict(dist_aug)
+    N = m.GetNumAtoms()
     
-    #merge with original df
-    df = pd.concat([df, df_aug], sort=False).reset_index(drop=True)
-    #shuffle the data
-    df = df.reindex(np.random.permutation(df.index))
-    return pd.DataFrame.from_dict(df).drop_duplicates('SMILES')
+    for i in range(N_rounds):
+        m_renum = Chem.RenumberAtoms(m, np.random.permutation(N).tolist())
+        smiles_random[i] = Chem.MolToSmiles(m_renum, canonical=False, isomericSmiles=True, kekuleSmiles=False)
+        
+    return list(set(smiles_random))
+
+def smiles_augmentation(df, N_rounds):   
+    SMILES = df['SMILES'].to_list()
+    canonical = df['canonical'].to_list()
+
+    SMILES_aug = []    
+    for smiles in SMILES:
+        smiles_random = randomize_smiles(smiles, N_rounds)
+        SMILES_aug += smiles_random
+            
+    canonical_aug = ['no'] * len(SMILES_aug)
+
+    #merge with original data
+    df = pd.DataFrame.from_dict({'SMILES' : SMILES + SMILES_aug,
+                                 'canonical' : canonical + canonical_aug})
+    
+    #shuffle the data   
+    return df.loc[np.random.permutation(df.index), :]
 
 # Don't include the defalut specific token of fastai, only keep the padding token
 BOS,EOS,FLD,UNK,PAD = 'xxbos','xxeos','xxfld','xxunk','xxpad'
