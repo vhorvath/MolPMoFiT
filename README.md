@@ -17,6 +17,11 @@ We recommand to build the enviroment with `Conda`.
 conda env create -f molpmofit.yml
 ```
 
+Install Conda kernel choices for Jupyter (Lab)
+```
+conda install nb_conda_kernels
+```
+
 ## Datasets
 
 We provide all the datasets needed to reproduce the experiments in the `data` folder.
