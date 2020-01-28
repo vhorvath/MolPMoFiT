@@ -60,10 +60,11 @@ class MolTokenizer(BaseTokenizer):
         self.__merge_elements = merge_elements if merge_elements is not None else []
         
     def tokenizer(self, smiles):
-        # add specific token '[BOS]' to represetences the start of SMILES
         regex = '(\[[^\[\]]{1,10}\])'
         parts = re.split(regex, smiles)
-        tokens = []
+
+        # add specific token '[BOS]' to represetences the start of SMILES
+        tokens = ['[BOS]']
        
         if self.__special_tokens:
             for part in parts:
@@ -78,8 +79,8 @@ class MolTokenizer(BaseTokenizer):
         # merge two letter element tokens
         for element in self.__merge_elements:
             MolTokenizer.patch_double(tokens, element)
-        
-        return ['[BOS]'] + tokens
+
+        return tokens
     
     @staticmethod
     def patch_double(tokens, pair):
